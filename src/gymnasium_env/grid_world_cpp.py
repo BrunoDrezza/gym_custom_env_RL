@@ -30,11 +30,18 @@ import pygame
 # The episode ends when all free cells are visited or max steps is reached.
 #
 
+
 class GridWorldCPPEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size: int = 5, obs_quantity: int = 3, max_steps: int = 200):
+    def __init__(
+        self,
+        render_mode=None,
+        size: int = 5,
+        obs_quantity: int = 3,
+        max_steps: int = 200,
+    ):
         self.size = size
         self.window_size = 512
         self.obs_quantity = obs_quantity
@@ -46,29 +53,31 @@ class GridWorldCPPEnv(gym.Env):
         self.visited = set()
 
         self._agent_location = np.array([-1, -1], dtype=int)
-        self._neighbors = np.zeros((3, 3), dtype=int)  # 3x3 matrix centered on agent
+        self._neighbors = np.zeros((5, 5), dtype=int)  # Agora é uma matriz 5x5
 
-        # Observation: Dict with agent info (x, y, coverage) and 3x3 neighbor matrix
-        self.observation_space = gym.spaces.Dict({
-            "agent": gym.spaces.Box(
-                low=np.array([0.0, 0.0, 0.0], dtype=np.float32),
-                high=np.array([1.0, 1.0, 1.0], dtype=np.float32),
-                dtype=np.float32
-            ),
-            "neighbors": gym.spaces.Box(
-                low=np.zeros((3, 3), dtype=np.float32),
-                high=np.full((3, 3), 2.0, dtype=np.float32),
-                dtype=np.float32
-            ),
-        })
+        # Observation: Dict with agent info (x, y, coverage) and 5x5 neighbor matrix
+        self.observation_space = gym.spaces.Dict(
+            {
+                "agent": gym.spaces.Box(
+                    low=np.array([0.0, 0.0, 0.0], dtype=np.float32),
+                    high=np.array([1.0, 1.0, 1.0], dtype=np.float32),
+                    dtype=np.float32,
+                ),
+                "neighbors": gym.spaces.Box(
+                    low=np.zeros((5, 5), dtype=np.float32),
+                    high=np.full((5, 5), 2.0, dtype=np.float32),
+                    dtype=np.float32,
+                ),
+            }
+        )
 
         # 4 actions: right, up, left, down
         self.action_space = gym.spaces.Discrete(4)
         self._action_to_direction = {
-            0: np.array([1, 0]),   # right
+            0: np.array([1, 0]),  # right
             1: np.array([0, -1]),  # up
             2: np.array([-1, 0]),  # left
-            3: np.array([0, 1]),   # down
+            3: np.array([0, 1]),  # down
         }
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -83,15 +92,22 @@ class GridWorldCPPEnv(gym.Env):
 
     @property
     def coverage_ratio(self):
-        return len(self.visited) / self.total_free_cells if self.total_free_cells > 0 else 1.0
+        return (
+            len(self.visited) / self.total_free_cells
+            if self.total_free_cells > 0
+            else 1.0
+        )
 
     def _get_obs(self):
         return {
-            "agent": np.array([
-                self._agent_location[0] / self.size,
-                self._agent_location[1] / self.size,
-                self.coverage_ratio,
-            ], dtype=np.float32),
+            "agent": np.array(
+                [
+                    self._agent_location[0] / self.size,
+                    self._agent_location[1] / self.size,
+                    self.coverage_ratio,
+                ],
+                dtype=np.float32,
+            ),
             "neighbors": self._neighbors.astype(np.float32),
         }
 
@@ -105,15 +121,16 @@ class GridWorldCPPEnv(gym.Env):
         }
 
     def set_neighbors(self, obstacles_locations):
-        # Create a 3x3 matrix centered on the agent's location.
-        # Row index i corresponds to agent_y + (i-1), col index j to agent_x + (j-1).
-        # 0 = free (not yet visited), 1 = obstacle or wall (out-of-bounds), 2 = already visited.
-        matrix = np.zeros((3, 3), dtype=int)
-        for i in range(3):
-            for j in range(3):
-                nx = self._agent_location[0] + (j - 1)
-                ny = self._agent_location[1] + (i - 1)
+        # Create a 5x5 matrix centered on the agent's location.
+        matrix = np.zeros((5, 5), dtype=int)
+        for i in range(5):
+            for j in range(5):
+                # j - 2 e i - 2 garantem que a posição [2,2] da matriz seja o agente
+                nx = self._agent_location[0] + (j - 2)
+                ny = self._agent_location[1] + (i - 2)
                 neighbor = np.array([nx, ny])
+
+                # As regras de preenchimento continuam idênticas
                 if not (0 <= nx < self.size and 0 <= ny < self.size):
                     matrix[i][j] = 1
                 elif any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
@@ -134,9 +151,13 @@ class GridWorldCPPEnv(gym.Env):
         # Place obstacles
         for _ in range(self.obs_quantity):
             obstacle_location = self._agent_location.copy()
-            while (np.array_equal(obstacle_location, self._agent_location) or
-                   any(np.array_equal(obstacle_location, loc) for loc in self.obstacles_locations)):
-                obstacle_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+            while np.array_equal(obstacle_location, self._agent_location) or any(
+                np.array_equal(obstacle_location, loc)
+                for loc in self.obstacles_locations
+            ):
+                obstacle_location = self.np_random.integers(
+                    0, self.size, size=2, dtype=int
+                )
             self.obstacles_locations.append(obstacle_location)
 
         # Mark starting position as visited
@@ -162,7 +183,10 @@ class GridWorldCPPEnv(gym.Env):
         )
 
         # If the agent hits an obstacle, stay in place
-        if any(np.array_equal(self._agent_location, loc) for loc in self.obstacles_locations):
+        if any(
+            np.array_equal(self._agent_location, loc)
+            for loc in self.obstacles_locations
+        ):
             self._agent_location = old_location
 
         self.set_neighbors(self.obstacles_locations)
@@ -217,9 +241,7 @@ class GridWorldCPPEnv(gym.Env):
         if self.window is None and self.render_mode == "human":
             pygame.init()
             pygame.display.init()
-            self.window = pygame.display.set_mode(
-                (self.window_size, self.window_size)
-            )
+            self.window = pygame.display.set_mode((self.window_size, self.window_size))
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
@@ -262,16 +284,27 @@ class GridWorldCPPEnv(gym.Env):
         font = pygame.font.SysFont(None, 24)
         coverage_text = font.render(
             f"Coverage: {self.coverage_ratio:.1%} | Steps: {self.count_steps}",
-            True, (0, 0, 0)
+            True,
+            (0, 0, 0),
         )
         canvas.blit(coverage_text, (5, 5))
 
         # Draw gridlines
         for x in range(self.size + 1):
-            pygame.draw.line(canvas, 0, (0, pix_square_size * x),
-                             (self.window_size, pix_square_size * x), width=3)
-            pygame.draw.line(canvas, 0, (pix_square_size * x, 0),
-                             (pix_square_size * x, self.window_size), width=3)
+            pygame.draw.line(
+                canvas,
+                0,
+                (0, pix_square_size * x),
+                (self.window_size, pix_square_size * x),
+                width=3,
+            )
+            pygame.draw.line(
+                canvas,
+                0,
+                (pix_square_size * x, 0),
+                (pix_square_size * x, self.window_size),
+                width=3,
+            )
 
         if self.render_mode == "human":
             self.window.blit(canvas, canvas.get_rect())

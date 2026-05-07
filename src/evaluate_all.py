@@ -6,11 +6,11 @@ import numpy as np
 import os
 from gymnasium_env.grid_world_cpp import GridWorldCPPEnv
 
-# Registra o ambiente customizado
+# Registra o ambiente customizado (com correção de tipagem para o Pylance)
 try:
     gym.register(
         id="gymnasium_env/GridWorldCPP-v0",
-        entry_point=GridWorldCPPEnv,
+        entry_point=lambda **kwargs: GridWorldCPPEnv(**kwargs),
     )
 except Exception:
     pass
@@ -63,11 +63,21 @@ def evaluate_scenario(model_path, dim, obstacles, max_steps, num_episodes=100):
 if __name__ == "__main__":
     print("Iniciando bateria de testes...")
 
-    # Dicionário de configurações: adapte os caminhos dos .zip conforme você for treinando
+    # Dicionário de configurações com os caminhos corretos (sem ../)
     scenarios = [
-        {"dim": 5, "obs": 3, "steps": 200, "model": "../data/modelo_final_5x5.zip"},
-        {"dim": 10, "obs": 12, "steps": 400, "model": "../data/modelo_final_10x10.zip"},
-        {"dim": 20, "obs": 48, "steps": 800, "model": "../data/modelo_final_20x20.zip"},
+        {
+            "dim": 5,
+            "obs": 3,
+            "steps": 200,
+            "model": "data/ppo_cpp_5_3_200_0.05_20260507_142958.zip",
+        },
+        {
+            "dim": 10,
+            "obs": 12,
+            "steps": 400,
+            "model": "data/ppo_cpp_10_12_400_0.05_20260507_151104_curriculum.zip",
+        },
+        {"dim": 20, "obs": 48, "steps": 800, "model": "data/modelo_final_20x20.zip"},
     ]
 
     print("\n| Cenário | Taxa de Sucesso (100%) | Cobertura Média | Passos Médios |")
@@ -81,7 +91,7 @@ if __name__ == "__main__":
             max_steps=config["steps"],
         )
 
-        if success_rate is not None:
+        if avg_cov is not None:
             print(
                 f"| {config['dim']}x{config['dim']}   | {success_rate:5.1f}%                 | {avg_cov:6.2f}%         | {avg_steps:7.1f}       |"
             )
