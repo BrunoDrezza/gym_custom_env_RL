@@ -22,15 +22,24 @@ try:
 except Exception:
     pass
 
-def evaluate_scenario(model_path, env_type, dim, obstacles, max_steps, num_episodes=100):
+
+def evaluate_scenario(
+    model_path, env_type, dim, obstacles, max_steps, num_episodes=100
+):
     if not os.path.exists(model_path):
         return f"Modelo não encontrado em: {model_path}", None, None
 
-    print(f"Avaliando cenário {dim}x{dim} ({env_type.upper()}) com modelo {model_path}...")
-    
+    print(
+        f"Avaliando cenário {dim}x{dim} ({env_type.upper()}) com modelo {model_path}..."
+    )
+
     # Define qual ID usar com base no tipo
-    env_id = "gymnasium_env/GridWorldCPP-Smart-v0" if env_type == "smart" else "gymnasium_env/GridWorldCPP-Dumb-v0"
-    
+    env_id = (
+        "gymnasium_env/GridWorldCPP-Smart-v0"
+        if env_type == "smart"
+        else "gymnasium_env/GridWorldCPP-Dumb-v0"
+    )
+
     model = PPO.load(model_path)
     env = gym.make(
         env_id,
@@ -67,19 +76,49 @@ def evaluate_scenario(model_path, env_type, dim, obstacles, max_steps, num_episo
 
     return full_coverage_rate, avg_coverage, avg_steps
 
+
 if __name__ == "__main__":
     print("Iniciando bateria de testes...")
 
     # Dicionário de configurações: Agora inclui qual ambiente o modelo usa!
     scenarios = [
         # Modelos Base (Míopes)
-        {"type": "dumb", "dim": 5, "obs": 3, "steps": 200, "model": "data/ppo_cpp_5_3_200_0.05_20260507_142958.zip"},
-        {"type": "dumb", "dim": 10, "obs": 12, "steps": 400, "model": "data/ppo_cpp_10_12_400_0.05_20260507_151104_curriculum.zip"},
-        
+        {
+            "type": "dumb",
+            "dim": 5,
+            "obs": 3,
+            "steps": 200,
+            "model": "data/ppo_cpp_5_3_200_0.05_20260507_142958.zip",
+        },
+        {
+            "type": "dumb",
+            "dim": 10,
+            "obs": 12,
+            "steps": 400,
+            "model": "data/ppo_cpp_10_12_400_0.05_20260507_151104_curriculum.zip",
+        },
         # Modelos com Bússola e Reward Shaping (Apenas ajuste o nome quando treiná-los!)
-        {"type": "smart", "dim": 5, "obs": 3, "steps": 200, "model": "data/modelo_smart_5x5.zip"},
-        {"type": "smart", "dim": 10, "obs": 12, "steps": 400, "model": "data/modelo_smart_10x10.zip"},
-        {"type": "smart", "dim": 20, "obs": 48, "steps": 800, "model": "data/modelo_smart_20x20.zip"},
+        {
+            "type": "smart",
+            "dim": 5,
+            "obs": 3,
+            "steps": 200,
+            "model": "data/ppo_cpp_smart_5_3_200_0.05_20260507_225111.zip",
+        },
+        {
+            "type": "smart",
+            "dim": 10,
+            "obs": 12,
+            "steps": 400,
+            "model": "data/ppo_cpp_smart_10_12_400_0.05_20260507_233230_curriculum.zip",
+        },
+        {
+            "type": "smart",
+            "dim": 20,
+            "obs": 48,
+            "steps": 800,
+            "model": "data/modelo_smart_20x20.zip",
+        },
     ]
 
     print("\n| Cenário | Tipo  | Taxa de Sucesso | Cobertura Média | Passos Médios |")
@@ -95,8 +134,12 @@ if __name__ == "__main__":
         )
 
         if avg_cov is not None:
-            print(f"| {config['dim']}x{config['dim']}   | {config['type']:5s} | {success_rate:14.1f}% | {avg_cov:14.2f}% | {avg_steps:13.1f} |")
+            print(
+                f"| {config['dim']}x{config['dim']}   | {config['type']:5s} | {success_rate:14.1f}% | {avg_cov:14.2f}% | {avg_steps:13.1f} |"
+            )
         else:
-            print(f"| {config['dim']}x{config['dim']}   | {config['type']:5s} | ERRO: Modelo não encontrado                 |")
+            print(
+                f"| {config['dim']}x{config['dim']}   | {config['type']:5s} | ERRO: Modelo não encontrado                 |"
+            )
 
     print("\nAvaliação concluída.")
