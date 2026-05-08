@@ -1,14 +1,17 @@
 #
-# python train_grid_world_cpp.py <train|test|run|curriculum> dim obstacles max_steps total_timesteps
+# python train_grid_world_cpp.py <train|test|run|curriculum> <dumb|smart> dim obstacles max_steps [total_timesteps]
 #
 
 import gymnasium as gym
-from gymnasium_env.grid_world_cpp_dumb import GridWorldCPPEnv
+import sys
+from datetime import datetime
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.logger import configure
-from datetime import datetime
-import sys
+
+# Importa as duas versões do ambiente usando aliases
+from gymnasium_env.grid_world_cpp_dumb import GridWorldCPPEnv as DumbEnv
+from gymnasium_env.grid_world_cpp_smart import GridWorldCPPEnv as SmartEnv
 
 
 def print_action(action: int) -> str:
@@ -20,46 +23,59 @@ def print_action(action: int) -> str:
     }.get(action, "unknown")
 
 
-if sys.argv[1] not in ["train", "test", "run", "curriculum"]:
+# Validação principal dos argumentos
+if len(sys.argv) < 3 or sys.argv[1] not in ["train", "test", "run", "curriculum"] or sys.argv[2] not in ["dumb", "smart"]:
     print(
-        "Usage: python train_grid_world_cpp.py <train|test|run|curriculum> dim obstacles max_steps total_timesteps"
+        "Usage: python train_grid_world_cpp.py <train|test|run|curriculum> <dumb|smart> dim obstacles max_steps [total_timesteps]"
     )
     sys.exit(1)
-elif sys.argv[1] in ["train", "curriculum"]:
-    if len(sys.argv) != 6:
+
+mode = sys.argv[1]
+env_type = sys.argv[2]
+
+# Validação da quantidade de argumentos dependendo do modo
+if mode in ["train", "curriculum"]:
+    if len(sys.argv) != 7:
         print(
-            "Usage for training: python train_grid_world_cpp.py train|curriculum dim obstacles max_steps total_timesteps"
+            "Usage for training: python train_grid_world_cpp.py train|curriculum <dumb|smart> dim obstacles max_steps total_timesteps"
         )
         sys.exit(1)
-elif sys.argv[1] in ["test", "run"]:
-    if len(sys.argv) != 4:
+elif mode in ["test", "run"]:
+    if len(sys.argv) != 6:
         print(
-            "Usage for testing/running: python train_grid_world_cpp.py test|run dim obstacles"
+            "Usage for testing/running: python train_grid_world_cpp.py test|run <dumb|smart> dim obstacles max_steps"
         )
         sys.exit(1)
 
 # --- Hyperparameters ---
-mode = sys.argv[1]
-DIM = int(sys.argv[2])  # 5, 10, 20
-OBSTACLES = int(sys.argv[3])  # 3, 12, 48
-MAX_STEPS = int(sys.argv[4])  # 200, 500, 1000
-TOTAL_TIMESTEPS = int(sys.argv[5])  # 500_000
+DIM = int(sys.argv[3])          # 5, 10, 20
+OBSTACLES = int(sys.argv[4])    # 3, 12, 48
+MAX_STEPS = int(sys.argv[5])    # 200, 500, 1000
+TOTAL_TIMESTEPS = int(sys.argv[6]) if len(sys.argv) == 7 else 0
 ENTROPY_COEF = 0.05
 # -----------------------
 
+# Registro Duplo dos Ambientes
 try:
     gym.register(
-        id="gymnasium_env/GridWorldCPP-v0",
-        entry_point=GridWorldCPPEnv,
+        id="gymnasium_env/GridWorldCPP-Dumb-v0",
+        entry_point=lambda **kwargs: DumbEnv(**kwargs),
+    )
+    gym.register(
+        id="gymnasium_env/GridWorldCPP-Smart-v0",
+        entry_point=lambda **kwargs: SmartEnv(**kwargs),
     )
 except Exception:
     pass
 
+# Define qual ID o script vai usar baseado no input do usuário
+TARGET_ENV_ID = "gymnasium_env/GridWorldCPP-Smart-v0" if env_type == "smart" else "gymnasium_env/GridWorldCPP-Dumb-v0"
+
 
 if mode == "train":
-    print("--- Starting CPP Training ---")
+    print(f"--- Starting CPP Training ({env_type.upper()}) ---")
     env = gym.make(
-        "gymnasium_env/GridWorldCPP-v0",
+        TARGET_ENV_ID,
         size=DIM,
         obs_quantity=OBSTACLES,
         max_steps=MAX_STEPS,
@@ -78,9 +94,10 @@ if mode == "train":
     )
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = f"log/ppo_cpp_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}"
+    # Adicionamos o env_type no nome para organizar os arquivos gerados
+    log_dir = f"log/ppo_cpp_{env_type}_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}"
     model_path = (
-        f"data/ppo_cpp_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}.zip"
+        f"data/ppo_cpp_{env_type}_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}.zip"
     )
 
     new_logger = configure(log_dir, ["stdout", "csv", "tensorboard"])
@@ -93,36 +110,35 @@ if mode == "train":
     print(f"Logs saved to {log_dir}")
 
 elif mode == "curriculum":
-
-    print("--- Starting CPP Curriculum Learning Training ---")
+    print(f"--- Starting CPP Curriculum Learning Training ({env_type.upper()}) ---")
 
     model_name = input(
-        "Enter model filename (e.g., ppo_cpp_5_3_200_0.05_20260324_100000): "
+        "Enter model filename (e.g., ppo_cpp_smart_5_3_200_0.05_20260324_100000): "
     )
     model_path = f"data/{model_name}.zip"
 
     env = gym.make(
-        "gymnasium_env/GridWorldCPP-v0",
+        TARGET_ENV_ID,
         size=DIM,
         obs_quantity=OBSTACLES,
         max_steps=MAX_STEPS,
         render_mode="rgb_array",
     )
 
-    # Carrega os pesos do modelo 5x5 e associa ao novo ambiente
+    # Carrega os pesos do modelo anterior e associa ao novo ambiente
     model = PPO.load(model_path, env=env, device="cpu")
 
-    # Continua o treinamento com os pesos já inicializados
+    # Primeiro reset de timesteps não zera completamente os pesos, é uma prática do SB3 para transfer learning
     model.learn(total_timesteps=MAX_STEPS, reset_num_timesteps=False)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = f"log/ppo_cpp_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}_curriculum"
-    model_path = f"data/ppo_cpp_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}_curriculum.zip"
+    log_dir = f"log/ppo_cpp_{env_type}_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}_curriculum"
+    model_path = f"data/ppo_cpp_{env_type}_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}_curriculum.zip"
 
     new_logger = configure(log_dir, ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
 
-    print(f"Starting learning with {TOTAL_TIMESTEPS} timesteps...")
+    print(f"Starting curriculum learning with {TOTAL_TIMESTEPS} timesteps...")
     model.learn(total_timesteps=TOTAL_TIMESTEPS)
     model.save(model_path)
     print(f"Model trained and saved to {model_path}")
@@ -130,14 +146,14 @@ elif mode == "curriculum":
 
 elif mode == "run":
     model_name = input(
-        "Enter model filename (e.g., ppo_cpp_5_3_200_0.05_20260324_100000): "
+        "Enter model filename (e.g., ppo_cpp_smart_5_3_200_0.05_20260324_100000): "
     )
     model_path = f"data/{model_name}.zip"
-    print(f"--- Loading model from {model_path} for a run ---")
+    print(f"--- Loading {env_type.upper()} model from {model_path} for a run ---")
 
     model = PPO.load(model_path)
     env = gym.make(
-        "gymnasium_env/GridWorldCPP-v0",
+        TARGET_ENV_ID,
         size=DIM,
         obs_quantity=OBSTACLES,
         max_steps=MAX_STEPS,
@@ -149,6 +165,7 @@ elif mode == "run":
     truncated = False
     steps = 0
     total_reward = 0
+    
     while not done and not truncated:
         action, _ = model.predict(obs, deterministic=False)
         obs, reward, done, truncated, info = env.step(action.item())
@@ -159,20 +176,21 @@ elif mode == "run":
             f"Reward: {reward:.2f}, Coverage: {info['coverage']:.1%}, "
             f"Done: {done}, Truncated: {truncated}"
         )
+        
     print(
         f"--- Run Finished --- Total reward: {total_reward:.2f}, Coverage: {info['coverage']:.1%}"
     )
 
 elif mode == "test":
     model_name = input(
-        "Enter model filename (e.g., ppo_cpp_5_3_200_0.05_20260324_100000): "
+        "Enter model filename (e.g., ppo_cpp_smart_5_3_200_0.05_20260324_100000): "
     )
     model_path = f"data/{model_name}.zip"
-    print(f"--- Loading model from {model_path} for testing ---")
+    print(f"--- Loading {env_type.upper()} model from {model_path} for testing ---")
 
     model = PPO.load(model_path)
     env = gym.make(
-        "gymnasium_env/GridWorldCPP-v0",
+        TARGET_ENV_ID,
         size=DIM,
         obs_quantity=OBSTACLES,
         max_steps=MAX_STEPS,
@@ -189,6 +207,7 @@ elif mode == "test":
         done = False
         truncated = False
         steps = 0
+        
         while not done and not truncated:
             action, _ = model.predict(obs, deterministic=False)
             obs, reward, done, truncated, info = env.step(action.item())
@@ -210,7 +229,8 @@ elif mode == "test":
     standard_deviation = np.std(total_coverages) * 100
     avg_steps = np.mean(total_steps_list)
     standard_deviation_steps = np.std(total_steps_list)
-    print(f"\n--- Test Finished ---")
+    
+    print(f"\n--- Test Finished ({env_type.upper()} Model) ---")
     print(
         f"Full Coverage Rate: {full_coverage_rate:.2f}% ({full_coverage_count}/{num_episodes})"
     )
