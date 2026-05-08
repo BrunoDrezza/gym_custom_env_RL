@@ -58,16 +58,16 @@ Os gráficos abaixo ilustram as curvas de aprendizado extraídas do TensorBoard.
 O agente *Smart* apresenta uma convergência clara de recompensa e uma redução drástica na duração do episódio (`ep_len_mean`) no 10x10, provando que a bússola resolveu o problema do loop infinito.
 
 * **5x5 Smart:** 
- ![Gráfico de Treino 5x5](./data\5x5_learning_curve_smart.png)
+ ![Gráfico de Treino 5x5](./data/5x5_learning_curve_smart.png)
 * **10x10 Smart:** 
-![Gráfico de Treino 10x10](data\10x10_learning_curve_smart.png)
+![Gráfico de Treino 10x10](.data/10x10_learning_curve_smart.png)
 
 ### B. Cenário 20x20
 
 A estabilização em 800 passos com recompensa negativa reflete o custo acumulado de tempo e a presença de células inacessíveis.
 
 * **20x20 Smart:** 
-![Gráfico de Treino 20x20](data\20x20_learning_curve_smart.png)
+![Gráfico de Treino 20x20](.data/20x20_learning_curve_smart.png)
 
 ---
 
