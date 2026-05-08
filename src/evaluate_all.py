@@ -4,7 +4,7 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 import numpy as np
 import os
-from gymnasium_env.grid_world_cpp import GridWorldCPPEnv
+from gymnasium_env.grid_world_cpp_dumb import GridWorldCPPEnv
 
 # Registra o ambiente customizado (com correção de tipagem para o Pylance)
 try:
