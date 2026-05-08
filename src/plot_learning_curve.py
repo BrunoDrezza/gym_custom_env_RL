@@ -44,10 +44,13 @@ if __name__ == "__main__":
     )
 
     caminho_do_csv_5x5_smart = (
-        "log/ppo_cpp_smart_5_3_200_0.05_20260507_225111/progress.csv"
+        "log/ppo_cpp_smart_5_3_200_0.05_20260508_031019/progress.csv"
     )
     caminho_do_csv_10x10_smart = (
-        "log/ppo_cpp_smart_10_12_400_0.05_20260507_233230_curriculum/progress.csv"
+        "log/ppo_cpp_smart_10_12_400_0.05_20260508_051447_curriculum/progress.csv"
+    )
+    caminho_do_csv_20x20_smart = (
+        "log/ppo_cpp_smart_20_48_800_0.05_20260508_142230_curriculum/progress.csv"
     )
 
     plot_curve(
@@ -72,4 +75,10 @@ if __name__ == "__main__":
         csv_path=caminho_do_csv_10x10_smart,
         save_name="10x10_learning_curve_smart",
         title="Curva de Aprendizado - Coverage Path Planning (10x10) smart",
+    )
+
+    plot_curve(
+        csv_path=caminho_do_csv_20x20_smart,
+        save_name="20x20_learning_curve_smart",
+        title="Curva de Aprendizado - Coverage Path Planning (20x20) smart",
     )

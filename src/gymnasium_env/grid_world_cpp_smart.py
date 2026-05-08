@@ -213,7 +213,7 @@ class GridWorldCPPEnv(gym.Env):
     def step(self, action):
         # 1. Pega a distância para a sujeira mais próxima ANTES de se mover
         _, dist_before = self._get_nearest_unvisited_info()
-        
+
         direction = self._action_to_direction[action]
         old_location = self._agent_location.copy()
 
@@ -223,7 +223,10 @@ class GridWorldCPPEnv(gym.Env):
         )
 
         # Se bater em um obstáculo, volta para a posição anterior
-        if any(np.array_equal(self._agent_location, loc) for loc in self.obstacles_locations):
+        if any(
+            np.array_equal(self._agent_location, loc)
+            for loc in self.obstacles_locations
+        ):
             self._agent_location = old_location
 
         self.set_neighbors(self.obstacles_locations)
@@ -254,8 +257,8 @@ class GridWorldCPPEnv(gym.Env):
         # --- Injeção de Reward Shaping ---
         # Se a distância diminuiu, ganha bônus. Se aumentou, recebe penalidade leve.
         # Isso cria um gradiente que guia o agente mesmo quando ele não vê a sujeira.
-        shaping = (dist_before - dist_after) * 0.1 
-        reward += shaping
+        # shaping = (dist_before - dist_after) * 0.1
+        # reward += shaping
 
         # Verifica se atingiu cobertura total
         full_coverage = len(self.visited) >= self.total_free_cells

@@ -103,21 +103,21 @@ if __name__ == "__main__":
             "dim": 5,
             "obs": 3,
             "steps": 200,
-            "model": "data/ppo_cpp_smart_5_3_200_0.05_20260507_225111.zip",
+            "model": "data/ppo_cpp_smart_5_3_200_0.05_20260508_031019.zip",
         },
         {
             "type": "smart",
             "dim": 10,
             "obs": 12,
             "steps": 400,
-            "model": "data/ppo_cpp_smart_10_12_400_0.05_20260507_233230_curriculum.zip",
+            "model": "data/ppo_cpp_smart_10_12_400_0.05_20260508_051447_curriculum.zip",
         },
         {
             "type": "smart",
             "dim": 20,
             "obs": 48,
             "steps": 800,
-            "model": "data/modelo_smart_20x20.zip",
+            "model": "data/ppo_cpp_smart_20_48_800_0.05_20260508_142230_curriculum.zip",
         },
     ]
 
