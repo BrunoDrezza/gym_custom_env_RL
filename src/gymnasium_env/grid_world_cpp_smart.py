@@ -211,38 +211,73 @@ class GridWorldCPPEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        # Pega distância antes do movimento
+        # 1. Pega a distância para a sujeira mais próxima ANTES de se mover
         _, dist_before = self._get_nearest_unvisited_info()
-
+        
         direction = self._action_to_direction[action]
         old_location = self._agent_location.copy()
 
-        # ... (código de movimento original) ...
+        # Move o agente (dentro dos limites do grid)
         self._agent_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
         )
-        if any(
-            np.array_equal(self._agent_location, loc)
-            for loc in self.obstacles_locations
-        ):
+
+        # Se bater em um obstáculo, volta para a posição anterior
+        if any(np.array_equal(self._agent_location, loc) for loc in self.obstacles_locations):
             self._agent_location = old_location
 
         self.set_neighbors(self.obstacles_locations)
         self.count_steps += 1
 
-        # Pega distância depois do movimento
+        # 2. Pega a distância para a sujeira mais próxima DEPOIS de se mover
         _, dist_after = self._get_nearest_unvisited_info()
 
-        # Recompensa base
+        # --- Lógica de Recompensa CPP ---
+        current_pos = tuple(self._agent_location)
+        is_new_cell = current_pos not in self.visited
+        stayed_in_place = np.array_equal(self._agent_location, old_location)
+
+        # Penalidade base por passo para incentivar rapidez
         reward = -0.1
-        # ... (recompensas de is_new_cell, stayed_in_place, etc.) ...
+
+        if stayed_in_place:
+            # Penalidade por colisão com parede ou obstáculo
+            reward -= 0.5
+        elif is_new_cell:
+            # Recompensa por explorar célula nova
+            reward += 1.0
+            self.visited.add(current_pos)
+        else:
+            # Penalidade por revisitar célula já limpa
+            reward -= 0.3
 
         # --- Injeção de Reward Shaping ---
-        # Se reduziu a distância, ganha bônus. Se aumentou, penalidade.
-        shaping = (dist_before - dist_after) * 0.1
+        # Se a distância diminuiu, ganha bônus. Se aumentou, recebe penalidade leve.
+        # Isso cria um gradiente que guia o agente mesmo quando ele não vê a sujeira.
+        shaping = (dist_before - dist_after) * 0.1 
         reward += shaping
 
-        # ... (resto do método step: terminated, truncated, etc.) ...
+        # Verifica se atingiu cobertura total
+        full_coverage = len(self.visited) >= self.total_free_cells
+        terminated = full_coverage
+
+        if full_coverage:
+            reward += 10.0
+
+        # Truncamento por limite de passos
+        if self.count_steps >= self.max_steps and not terminated:
+            truncated = True
+            reward -= 5.0
+        else:
+            truncated = False
+
+        observation = self._get_obs()
+        info = self._get_info()
+
+        if self.render_mode == "human":
+            self._render_frame()
+
+        return observation, reward, terminated, truncated, info
 
     def render(self):
         if self.render_mode == "rgb_array":
