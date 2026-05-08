@@ -4,30 +4,40 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 import numpy as np
 import os
-from gymnasium_env.grid_world_cpp_dumb import GridWorldCPPEnv
 
-# Registra o ambiente customizado (com correção de tipagem para o Pylance)
+# Importa as duas versões usando aliases
+from gymnasium_env.grid_world_cpp_dumb import GridWorldCPPEnv as DumbEnv
+from gymnasium_env.grid_world_cpp_smart import GridWorldCPPEnv as SmartEnv
+
+# Registra os dois ambientes separadamente
 try:
     gym.register(
-        id="gymnasium_env/GridWorldCPP-v0",
-        entry_point=lambda **kwargs: GridWorldCPPEnv(**kwargs),
+        id="gymnasium_env/GridWorldCPP-Dumb-v0",
+        entry_point=lambda **kwargs: DumbEnv(**kwargs),
+    )
+    gym.register(
+        id="gymnasium_env/GridWorldCPP-Smart-v0",
+        entry_point=lambda **kwargs: SmartEnv(**kwargs),
     )
 except Exception:
     pass
 
-
-def evaluate_scenario(model_path, dim, obstacles, max_steps, num_episodes=100):
+def evaluate_scenario(model_path, env_type, dim, obstacles, max_steps, num_episodes=100):
     if not os.path.exists(model_path):
         return f"Modelo não encontrado em: {model_path}", None, None
 
-    print(f"Avaliando cenário {dim}x{dim} com modelo {model_path}...")
+    print(f"Avaliando cenário {dim}x{dim} ({env_type.upper()}) com modelo {model_path}...")
+    
+    # Define qual ID usar com base no tipo
+    env_id = "gymnasium_env/GridWorldCPP-Smart-v0" if env_type == "smart" else "gymnasium_env/GridWorldCPP-Dumb-v0"
+    
     model = PPO.load(model_path)
     env = gym.make(
-        "gymnasium_env/GridWorldCPP-v0",
+        env_id,
         size=dim,
         obs_quantity=obstacles,
         max_steps=max_steps,
-        render_mode="rgb_array",  # Modo rápido, sem renderização visual
+        render_mode="rgb_array",
     )
 
     full_coverage_count = 0
@@ -41,9 +51,7 @@ def evaluate_scenario(model_path, dim, obstacles, max_steps, num_episodes=100):
         steps = 0
 
         while not done and not truncated:
-            action, _ = model.predict(
-                obs, deterministic=True
-            )  # Usamos determinístico no teste final
+            action, _ = model.predict(obs, deterministic=True)
             obs, reward, done, truncated, info = env.step(action.item())
             steps += 1
 
@@ -59,45 +67,36 @@ def evaluate_scenario(model_path, dim, obstacles, max_steps, num_episodes=100):
 
     return full_coverage_rate, avg_coverage, avg_steps
 
-
 if __name__ == "__main__":
     print("Iniciando bateria de testes...")
 
-    # Dicionário de configurações com os caminhos corretos (sem ../)
+    # Dicionário de configurações: Agora inclui qual ambiente o modelo usa!
     scenarios = [
-        {
-            "dim": 5,
-            "obs": 3,
-            "steps": 200,
-            "model": "data/ppo_cpp_5_3_200_0.05_20260507_142958.zip",
-        },
-        {
-            "dim": 10,
-            "obs": 12,
-            "steps": 400,
-            "model": "data/ppo_cpp_10_12_400_0.05_20260507_151104_curriculum.zip",
-        },
-        {"dim": 20, "obs": 48, "steps": 800, "model": "data/modelo_final_20x20.zip"},
+        # Modelos Base (Míopes)
+        {"type": "dumb", "dim": 5, "obs": 3, "steps": 200, "model": "data/ppo_cpp_5_3_200_0.05_20260507_142958.zip"},
+        {"type": "dumb", "dim": 10, "obs": 12, "steps": 400, "model": "data/ppo_cpp_10_12_400_0.05_20260507_151104_curriculum.zip"},
+        
+        # Modelos com Bússola e Reward Shaping (Apenas ajuste o nome quando treiná-los!)
+        {"type": "smart", "dim": 5, "obs": 3, "steps": 200, "model": "data/modelo_smart_5x5.zip"},
+        {"type": "smart", "dim": 10, "obs": 12, "steps": 400, "model": "data/modelo_smart_10x10.zip"},
+        {"type": "smart", "dim": 20, "obs": 48, "steps": 800, "model": "data/modelo_smart_20x20.zip"},
     ]
 
-    print("\n| Cenário | Taxa de Sucesso (100%) | Cobertura Média | Passos Médios |")
-    print("|---------|------------------------|-----------------|---------------|")
+    print("\n| Cenário | Tipo  | Taxa de Sucesso | Cobertura Média | Passos Médios |")
+    print("|---------|-------|-----------------|-----------------|---------------|")
 
     for config in scenarios:
         success_rate, avg_cov, avg_steps = evaluate_scenario(
             model_path=config["model"],
+            env_type=config["type"],
             dim=config["dim"],
             obstacles=config["obs"],
             max_steps=config["steps"],
         )
 
         if avg_cov is not None:
-            print(
-                f"| {config['dim']}x{config['dim']}   | {success_rate:5.1f}%                 | {avg_cov:6.2f}%         | {avg_steps:7.1f}       |"
-            )
+            print(f"| {config['dim']}x{config['dim']}   | {config['type']:5s} | {success_rate:14.1f}% | {avg_cov:14.2f}% | {avg_steps:13.1f} |")
         else:
-            print(
-                f"| {config['dim']}x{config['dim']}   | ERRO: Modelo não encontrado |                 |               |"
-            )
+            print(f"| {config['dim']}x{config['dim']}   | {config['type']:5s} | ERRO: Modelo não encontrado                 |")
 
     print("\nAvaliação concluída.")
